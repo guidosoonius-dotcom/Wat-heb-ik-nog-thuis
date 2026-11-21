@@ -43,6 +43,21 @@ export interface Household {
   name: string
   invite_code: string
   shortcut_token: string
+  deals_checked_at: string | null
+}
+
+export interface Deal {
+  id: number
+  product_id: string
+  store: 'ah' | 'jumbo'
+  title: string
+  deal_text: string
+  price: number | null
+  old_price: number | null
+  image_url: string | null
+  url: string | null
+  online_only: boolean
+  valid_until: string | null
 }
 
 export type Status = 'ok' | 'low' | 'out' | 'none'

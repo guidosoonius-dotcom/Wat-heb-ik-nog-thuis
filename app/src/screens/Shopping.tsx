@@ -3,9 +3,11 @@ import { useInventory } from '../lib/inventory'
 import { byName, daysLeft, inBasket, isLow, needed, onShoppingList, predictedLow, staleBasket } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
+import { DealBadge, DealsSection, bestDeals } from '../components/Deals'
 
 export function Shopping() {
-  const { products, places, updateProduct, addProduct, finishShopping, checkItem, uncheckItem, notify } = useInventory()
+  const { products, places, deals, updateProduct, addProduct, finishShopping, checkItem, uncheckItem, notify } = useInventory()
+  const best = useMemo(() => bestDeals(deals, products), [deals, products])
   const [adding, setAdding] = useState(false)
   const [extra, setExtra] = useState('')
   const [busy, setBusy] = useState(false)
@@ -132,6 +134,7 @@ export function Shopping() {
                         {placeOf(p)?.name ?? 'Zonder plek'} · nog {p.qty} thuis
                         {predictedLow(p) ? ` · bijna op (± ${daysLeft(p)} d)` : !isLow(p) && p.on_list ? ' · extra' : ''}
                       </small>
+                      {best.get(p.id) && <DealBadge deal={best.get(p.id)!} />}
                     </span>
                   </button>
                   <div className="amount" style={{ background: placeOf(p)?.color ?? '#EEECE7' }}>
@@ -164,6 +167,8 @@ export function Shopping() {
           ))}
         </section>
       )}
+
+      <DealsSection />
 
       {list.length === 0 && <p className="empty">Het lijstje is leeg. Alles is op voorraad!</p>}
 

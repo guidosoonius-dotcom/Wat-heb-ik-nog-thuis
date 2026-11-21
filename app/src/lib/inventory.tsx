@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Category, Household, Place, Product } from './types'
+import type { Category, Deal, Household, Place, Product } from './types'
 
 export type ProductInput = Partial<Omit<Product, 'id' | 'household_id' | 'updated_at'>> & { name: string }
 
@@ -9,6 +9,8 @@ interface Inventory {
   household: Household | null
   places: Place[]
   categories: Category[]
+  deals: Deal[]
+  refreshDeals: () => Promise<void>
   products: Product[]
   loading: boolean
   toast: string | null
@@ -81,6 +83,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
   const [household, setHousehold] = useState<Household | null>(null)
   const [places, setPlaces] = useState<Place[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const productsRef = useRef<Product[]>([])
@@ -142,7 +145,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
   const reload = useCallback(async () => {
     const synced = await flush()
     const [h, pl, pr, ca] = await Promise.all([
-      supabase.from('households').select('id,name,invite_code,shortcut_token').eq('id', householdId).single(),
+      supabase.from('households').select('id,name,invite_code,shortcut_token,deals_checked_at').eq('id', householdId).single(),
       supabase.from('places').select('*').eq('household_id', householdId).order('sort'),
       supabase.from('products').select('*').eq('household_id', householdId).order('name'),
       supabase.from('categories').select('*').eq('household_id', householdId).order('sort'),
@@ -167,6 +170,14 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       // Nog niet verstuurde wijzigingen blijven lokaal zichtbaar tot ze zijn verwerkt.
       if (synced) setProducts(pr.data as Product[])
       writeJson(snapshotKey, { h: h.data, pl: pl.data, pr: pr.data, ca: ca.data })
+      const today = new Date().toISOString().slice(0, 10)
+      supabase
+        .from('deals')
+        .select('*')
+        .eq('household_id', householdId)
+        .then(({ data }) =>
+          setDeals(((data ?? []) as Deal[]).filter((d) => (!d.valid_until || d.valid_until >= today) && !/volume voordeel/i.test(d.deal_text))),
+        )
     }
     setLoading(false)
   }, [householdId, fail, flush, snapshotKey])
@@ -326,6 +337,14 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
     [fail, reload, queue],
   )
 
+  const refreshDeals = useCallback(async () => {
+    const { data, error } = await supabase.functions.invoke('fetch-deals', { method: 'POST' })
+    if (error) return fail(error)
+    if (data?.skipped) notify('Net al gecontroleerd. Probeer het over een paar minuten opnieuw.')
+    else notify(`Aanbiedingen bijgewerkt: ${data?.deals ?? 0} gevonden`)
+    await reload()
+  }, [fail, notify, reload])
+
   const finishShopping = useCallback(async () => {
     const { data, error } = await supabase.rpc('finish_shopping', { p_household: householdId })
     if (error) {
@@ -424,6 +443,8 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       household,
       places,
       categories,
+      deals,
+      refreshDeals,
       products,
       loading,
       toast,
@@ -446,7 +467,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       deletePlace,
       renameHousehold,
     }),
-    [household, places, categories, products, loading, toast, offline, pending, notify, reload, adjustQty, addProduct, updateProduct, deleteProduct, finishShopping, checkItem, uncheckItem, addPlace, addCategory, updateCategory, deleteCategory, updatePlace, deletePlace, renameHousehold],
+    [household, places, categories, deals, refreshDeals, products, loading, toast, offline, pending, notify, reload, adjustQty, addProduct, updateProduct, deleteProduct, finishShopping, checkItem, uncheckItem, addPlace, addCategory, updateCategory, deleteCategory, updatePlace, deletePlace, renameHousehold],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

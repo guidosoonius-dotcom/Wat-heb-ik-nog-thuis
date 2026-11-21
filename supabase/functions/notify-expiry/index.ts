@@ -67,12 +67,17 @@ async function weekly(supabase: ReturnType<typeof createClient>) {
     if (p.expiry_date && p.expiry_date <= soon) e.expiring.push(p.name)
     byHh.set(p.household_id, e)
   }
+  const { data: deals } = await supabase.from('deals').select('household_id, product_id')
+  const dealCount = new Map<string, Set<string>>()
+  for (const d of deals ?? []) dealCount.set(d.household_id, (dealCount.get(d.household_id) ?? new Set()).add(d.product_id))
   let sent = 0
   for (const [hh, { buy, expiring }] of byHh) {
-    if (!buy.length && !expiring.length) continue
+    const onSale = dealCount.get(hh)?.size ?? 0
+    if (!buy.length && !expiring.length && !onSale) continue
     const parts: string[] = []
     if (buy.length) parts.push(`${buy.length} op het lijstje (${buy.slice(0, 3).join(', ')}${buy.length > 3 ? '…' : ''})`)
     if (expiring.length) parts.push(`${expiring.length} verloopt binnen 2 weken`)
+    if (onSale) parts.push(`${onSale} in de aanbieding bij AH/Jumbo`)
     const payload = JSON.stringify({ title: 'Weekoverzicht', body: parts.join(' · '), url: '/' })
     const { data: subs } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('household_id', hh)
     for (const s of subs ?? []) {

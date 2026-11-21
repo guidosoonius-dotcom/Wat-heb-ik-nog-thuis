@@ -15,7 +15,8 @@ interface Props {
 }
 
 export function Home({ onOpen, onScan, onShowPlace, onShowList, onShowHousehold }: Props) {
-  const { products, places, household } = useInventory()
+  const { products, places, household, deals } = useInventory()
+  const dealCount = useMemo(() => new Set(deals.map((d) => d.product_id)).size, [deals])
   const [query, setQuery] = useState('')
 
   const low = useMemo(() => products.filter(isLow).sort((a, b) => a.qty - b.qty || byName(a, b)), [products])
@@ -75,6 +76,15 @@ export function Home({ onOpen, onScan, onShowPlace, onShowList, onShowHousehold 
               <span>Verloopt snel</span>
             </button>
           </div>
+
+          {dealCount > 0 && (
+            <button type="button" className="sort-banner" onClick={onShowList}>
+              <Icon name="tag" size={18} />
+              <span>
+                {dealCount} van jullie producten {dealCount === 1 ? 'is' : 'zijn'} nu in de aanbieding bij AH of Jumbo · <u>Bekijk</u>
+              </span>
+            </button>
+          )}
 
           <section className="stack-sm">
             <div className="section-head">
