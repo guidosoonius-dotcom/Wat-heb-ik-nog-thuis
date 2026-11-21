@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useInventory } from '../lib/inventory'
 import { byName, isLow } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
 import { ProductRow } from '../components/ProductRow'
+import { AutoSort } from '../components/AutoSort'
 
 export type StockFilter = 'all' | 'low' | 'expiry'
 
@@ -17,6 +18,8 @@ interface Props {
 export function Stock({ placeId, filter, onChange, onOpen }: Props) {
   const { products, places, categories } = useInventory()
   const place = places.find((p) => p.id === placeId) ?? null
+  const [sorting, setSorting] = useState(false)
+  const uncategorized = products.filter((p) => !p.category_id && (!placeId || p.place_id === placeId)).length
 
   const items = useMemo(() => {
     let list = products.filter((p) => !placeId || p.place_id === placeId)
@@ -86,6 +89,15 @@ export function Stock({ placeId, filter, onChange, onOpen }: Props) {
       </div>
 
       <div className="list-pad stack-sm">
+        {uncategorized > 0 && filter === 'all' && (
+          <button type="button" className="sort-banner" onClick={() => setSorting(true)}>
+            <Icon name="sparkle" size={18} />
+            <span>
+              {uncategorized} {uncategorized === 1 ? 'product' : 'producten'} zonder categorie · <u>Automatisch indelen</u>
+            </span>
+          </button>
+        )}
+        {sorting && <AutoSort onClose={() => setSorting(false)} />}
         {grouped
           ? grouped.map((g) => (
               <section key={g.place.id} className="stack-sm">

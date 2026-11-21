@@ -124,9 +124,15 @@ export function suggestPlace(
   if (name.length < 3 && !input.info?.categories.length) return null
 
   // 1. Staat er al een vergelijkbaar product in huis? Volg dan die indeling.
-  const lower = name.toLowerCase()
+  // Alle woorden van het bestaande product moeten als heel woord voorkomen ("Shampoo" in "Andrélon shampoo",
+  // maar "Pasta" niet in "Tandpasta").
+  const ownWords = new Set(words(name))
   const twin = products
-    .filter((p) => p.place_id && p.name.length >= 4 && lower.includes(p.name.toLowerCase()))
+    .filter((p) => {
+      if (!p.place_id || p.name.length < 4) return false
+      const w = words(p.name)
+      return w.length > 0 && w.every((x) => ownWords.has(x))
+    })
     .sort((a, b) => b.name.length - a.name.length)[0]
   if (twin) {
     return { reason: `net als ${twin.name}`, place: { id: twin.place_id! }, category: twin.category_id ? { id: twin.category_id } : null }

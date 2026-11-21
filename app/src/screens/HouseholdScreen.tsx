@@ -3,12 +3,14 @@ import { useInventory } from '../lib/inventory'
 import { supabase } from '../lib/supabase'
 import { currentSubscription, disablePush, enablePush, isIos, isStandalone, pushSupported } from '../lib/push'
 import { Icon } from '../components/Icon'
+import { AutoSort } from '../components/AutoSort'
 
 const COLORS = ['#F6E7D3', '#ECE4F1', '#E3EEDF', '#DCEBF3', '#F7DEDD', '#EEECE7']
 
 export function HouseholdScreen() {
   const { household, places, categories, products, renameHousehold, addPlace, updatePlace, deletePlace, addCategory, deleteCategory, notify } = useInventory()
   const [catDraft, setCatDraft] = useState<Record<string, string>>({})
+  const [sorting, setSorting] = useState(false)
   const [members, setMembers] = useState(1)
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
@@ -108,6 +110,11 @@ export function HouseholdScreen() {
 
       <section className="card form">
         <h2 className="h3">Plekken en categorieën</h2>
+        {products.some((p) => !p.category_id) && (
+          <button type="button" className="btn-secondary" onClick={() => setSorting(true)}>
+            <Icon name="sparkle" size={18} /> Automatisch indelen ({products.filter((p) => !p.category_id).length} zonder categorie)
+          </button>
+        )}
         <div className="stack-xs">
           {places.map((pl) => (
             <div key={pl.id} className="stack-xs">
@@ -198,6 +205,8 @@ export function HouseholdScreen() {
           </button>
         </form>
       </section>
+
+      {sorting && <AutoSort onClose={() => setSorting(false)} />}
 
       <button type="button" className="btn-ghost logout" onClick={() => supabase.auth.signOut()}>
         <Icon name="logout" size={18} /> Uitloggen

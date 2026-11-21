@@ -249,3 +249,10 @@ input { min-width: 0; }
 .cat-tag button { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: var(--muted); }
 .cat-add { display: flex; gap: 6px; padding-left: 42px; }
 .cat-add input { flex: 1; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 15px; outline: 0; min-width: 0; }
+.sort-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; text-align: left; }
+.sort-row.off { opacity: 0.55; }
+.sort-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sort-text strong { font-size: 15px; }
+.sort-text small { font-size: 13px; font-weight: 600; color: var(--accent); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cat-chip.new { background: #e2ede6; color: var(--accent); }
+.sort-banner { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #eef4ef; border: 1px solid #cfe1d5; color: var(--accent); font-size: 14px; font-weight: 600; text-align: left; min-height: 48px; }
