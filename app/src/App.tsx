@@ -7,6 +7,7 @@ import { onShoppingList } from './lib/logic'
 import type { Product } from './lib/types'
 import { Login } from './screens/Login'
 import { Onboarding } from './screens/Onboarding'
+import { SetPassword } from './screens/SetPassword'
 import { Home } from './screens/Home'
 import { Stock } from './screens/Stock'
 import type { StockFilter } from './screens/Stock'
@@ -23,10 +24,14 @@ type Tab = 'home' | 'stock' | 'list' | 'household'
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [householdId, setHouseholdId] = useState<string | null | undefined>(undefined)
+  const [recovery, setRecovery] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
+      setSession(s)
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -52,6 +57,7 @@ export default function App() {
     )
   }
   if (!session) return <Login />
+  if (recovery || !session.user.user_metadata?.has_password) return <SetPassword onDone={() => setRecovery(false)} />
   if (!householdId) return <Onboarding onReady={setHouseholdId} />
   return (
     <InventoryProvider householdId={householdId}>
