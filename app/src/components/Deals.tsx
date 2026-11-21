@@ -4,8 +4,16 @@ import { toBuy } from '../lib/logic'
 import type { Deal, Product } from '../lib/types'
 import { Icon } from './Icon'
 
-export const STORE_NAME: Record<Deal['store'], string> = { ah: 'Albert Heijn', jumbo: 'Jumbo' }
-const STORE_SHORT: Record<Deal['store'], string> = { ah: 'AH', jumbo: 'Jumbo' }
+export const STORE_NAME: Record<Deal['store'], string> = {
+  ah: 'Albert Heijn',
+  jumbo: 'Jumbo',
+  aldi: 'Aldi',
+  dirk: 'Dirk',
+  hoogvliet: 'Hoogvliet',
+  lidl: 'Lidl',
+  action: 'Action',
+}
+const STORE_SHORT: Record<Deal['store'], string> = { ...STORE_NAME, ah: 'AH' }
 
 const FOLDERS: [string, string][] = [
   ['AH Bonus', 'https://www.ah.nl/bonus'],
@@ -14,6 +22,7 @@ const FOLDERS: [string, string][] = [
   ['Aldi', 'https://www.aldi.nl/aanbiedingen.html'],
   ['Plus', 'https://www.plus.nl/aanbiedingen'],
   ['Dirk', 'https://www.dirk.nl/aanbiedingen'],
+  ['Hoogvliet', 'https://www.hoogvliet.com/aanbiedingen'],
   ['Kruidvat', 'https://www.kruidvat.nl/acties'],
   ['Etos', 'https://www.etos.nl/acties/'],
   ['Action', 'https://www.action.com/nl-nl/weekactie/'],
@@ -81,7 +90,7 @@ export function DealsSection() {
       </div>
       {stockUp.length === 0 ? (
         <p className="hint">
-          {deals.length ? 'Alles wat in de aanbieding is, staat al op je lijstje (zie de labels).' : 'Geen acties gevonden voor jullie producten bij AH en Jumbo.'}
+          {deals.length ? 'Alles wat in de aanbieding is, staat al op je lijstje (zie de labels).' : 'Geen acties gevonden voor jullie producten.'}
           {checked && ` Gecontroleerd: ${checked}.`}
         </p>
       ) : (
@@ -127,7 +136,7 @@ export function DealsSection() {
         </>
       )}
       <details className="folders">
-        <summary>Folders van andere winkels</summary>
+        <summary>Folders bekijken</summary>
         <div className="chips">
           {FOLDERS.map(([name, url]) => (
             <a key={name} className="chip" href={url} target="_blank" rel="noreferrer">

@@ -49,7 +49,7 @@ export interface Household {
 export interface Deal {
   id: number
   product_id: string
-  store: 'ah' | 'jumbo'
+  store: 'ah' | 'jumbo' | 'aldi' | 'dirk' | 'hoogvliet' | 'lidl' | 'action'
   title: string
   deal_text: string
   price: number | null

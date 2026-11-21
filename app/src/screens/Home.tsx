@@ -81,7 +81,7 @@ export function Home({ onOpen, onScan, onShowPlace, onShowList, onShowHousehold 
             <button type="button" className="sort-banner" onClick={onShowList}>
               <Icon name="tag" size={18} />
               <span>
-                {dealCount} van jullie producten {dealCount === 1 ? 'is' : 'zijn'} nu in de aanbieding bij AH of Jumbo · <u>Bekijk</u>
+                {dealCount} van jullie producten {dealCount === 1 ? 'is' : 'zijn'} nu in de aanbieding · <u>Bekijk</u>
               </span>
             </button>
           )}

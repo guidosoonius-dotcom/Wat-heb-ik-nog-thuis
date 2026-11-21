@@ -1,4 +1,5 @@
-// Zoekt dagelijks bij Albert Heijn en Jumbo welke producten uit de voorraad in de aanbieding zijn.
+// Zoekt dagelijks bij Albert Heijn en Jumbo welke producten uit de voorraad in de aanbieding zijn,
+// en koppelt de wekelijks uitgelezen folderaanbiedingen (Aldi, Dirk, Hoogvliet, Lidl, Action) aan de producten.
 // LET OP: gebruikt de niet-officiële koppelingen van de AH-app en de Jumbo-website; die kunnen
 // zonder waarschuwing veranderen. Fouten per winkel worden genegeerd, zodat de rest blijft werken.
 // Aanroep: door pg_cron met x-cron-secret (alle huishoudens), of vanuit de app met de JWT van de
@@ -6,6 +7,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const AH_UA = 'Appie/8.22.3'
+const FLYER_URLS: Record<string, string> = {
+  aldi: 'https://www.aldi.nl/aanbiedingen.html',
+  dirk: 'https://www.dirk.nl/aanbiedingen',
+  hoogvliet: 'https://www.hoogvliet.com/aanbiedingen',
+  lidl: 'https://www.lidl.nl/c/aanbiedingen/a10008785',
+  action: 'https://www.action.com/nl-nl/weekactie/',
+}
 const WEB_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -40,20 +48,21 @@ function words(s: string) {
   return s
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/-/g, '')
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
 }
 
 // Hoe goed past een aanbieding bij een product? 0 = niet.
+// Alleen hele woorden of woordbegin: "pasta" past dus wel bij "pastasaus" maar niet bij "tandpasta".
 function score(productName: string, title: string) {
   const keys = words(productName).filter((w) => w.length >= 4 && !/^\d/.test(w))
   if (!keys.length) return 0
   const main = [...keys].sort((a, b) => b.length - a.length)[0]
   const t = words(title)
   const hit = (k: string) =>
-    [k, ...(SYNONYMS[k] ?? [])].some((v) => t.some((w) => w === v || w.startsWith(v) || (v.length >= 5 && w.endsWith(v)) || (w.length >= 5 && v.startsWith(w))))
+    [k, ...(SYNONYMS[k] ?? [])].some((v) => t.some((w) => w === v || w.startsWith(v) || (w.length >= 5 && v.startsWith(w))))
   if (!hit(main)) return 0
   return 1 + keys.filter((k) => k !== main && hit(k)).length
 }
@@ -170,6 +179,34 @@ async function refreshHousehold(supabase: ReturnType<typeof createClient>, house
       }),
     )
   }
+  // Folderaanbiedingen (wekelijks uitgelezen door fetch-flyers) koppelen aan de producten.
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: flyers } = await supabase.from('flyer_deals').select('*').or(`valid_until.is.null,valid_until.gte.${today}`)
+  for (const p of list) {
+    const byStore = new Map<string, { f: Record<string, unknown>; s: number }>()
+    for (const f of flyers ?? []) {
+      const sc = score(p.name, f.title as string)
+      if (!sc) continue
+      const cur = byStore.get(f.store as string)
+      if (!cur || sc > cur.s) byStore.set(f.store as string, { f, s: sc })
+    }
+    for (const [store, { f }] of byStore) {
+      rows.push({
+        household_id: householdId,
+        product_id: p.id,
+        store,
+        title: f.title,
+        deal_text: f.deal_text,
+        price: f.price,
+        old_price: f.old_price,
+        image_url: null,
+        url: FLYER_URLS[store] ?? null,
+        online_only: false,
+        valid_until: f.valid_until,
+      })
+    }
+  }
+
   await supabase.from('deals').delete().eq('household_id', householdId)
   if (rows.length) await supabase.from('deals').insert(rows)
   await supabase.from('households').update({ deals_checked_at: new Date().toISOString() }).eq('id', householdId)

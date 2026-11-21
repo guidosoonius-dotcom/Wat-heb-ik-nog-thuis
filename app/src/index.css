@@ -294,3 +294,8 @@ input { min-width: 0; }
 .folders summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--accent); min-height: 44px; display: flex; align-items: center; }
 .folders .chips { padding-top: 4px; }
 .folders a.chip { display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); }
+.deal-badge.aldi { background: #e3ecf8; color: #0c3a7a; }
+.deal-badge.dirk { background: #fde7e5; color: #8f1d14; }
+.deal-badge.hoogvliet { background: #e6f2fb; color: #0b4f86; }
+.deal-badge.lidl { background: #fff2c2; color: #5e4600; }
+.deal-badge.action { background: #e2eefb; color: #0b3f7d; }
