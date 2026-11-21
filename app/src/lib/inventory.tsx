@@ -19,6 +19,8 @@ interface Inventory {
   updateProduct: (id: string, patch: Partial<Product>) => Promise<void>
   deleteProduct: (id: string) => Promise<void>
   finishShopping: () => Promise<number>
+  checkItem: (id: string) => Promise<Product | null>
+  uncheckItem: (id: string) => Promise<void>
   addPlace: (name: string, color: string, icon?: string) => Promise<Place | null>
   addCategory: (placeId: string, name: string) => Promise<Category | null>
   updateCategory: (id: string, patch: Partial<Category>) => Promise<void>
@@ -174,6 +176,43 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
     [fail],
   )
 
+  const checkItem = useCallback(
+    async (id: string) => {
+      setProducts((l) =>
+        l.map((p) => {
+          if (p.id !== id || p.list_checked) return p
+          const n = p.list_qty ?? Math.max(p.min_qty - p.qty, 1)
+          return { ...p, qty: p.qty + n, list_qty: n, list_checked: true, list_checked_at: new Date().toISOString() }
+        }),
+      )
+      const { data, error } = await supabase.rpc('check_item', { p_id: id })
+      if (error) {
+        fail(error)
+        reload()
+        return null
+      }
+      if (data) setProducts((l) => upsertLocal(l, data as Product))
+      return (data as Product) ?? null
+    },
+    [fail, reload],
+  )
+
+  const uncheckItem = useCallback(
+    async (id: string) => {
+      setProducts((l) =>
+        l.map((p) => (p.id === id && p.list_checked ? { ...p, qty: Math.max(p.qty - (p.list_qty ?? 0), 0), list_checked: false, list_checked_at: null } : p)),
+      )
+      const { data, error } = await supabase.rpc('uncheck_item', { p_id: id })
+      if (error) {
+        fail(error)
+        reload()
+        return
+      }
+      if (data) setProducts((l) => upsertLocal(l, data as Product))
+    },
+    [fail, reload],
+  )
+
   const finishShopping = useCallback(async () => {
     const { data, error } = await supabase.rpc('finish_shopping', { p_household: householdId })
     if (error) {
@@ -282,6 +321,8 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       updateProduct,
       deleteProduct,
       finishShopping,
+      checkItem,
+      uncheckItem,
       addPlace,
       addCategory,
       updateCategory,
@@ -290,7 +331,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       deletePlace,
       renameHousehold,
     }),
-    [household, places, categories, products, loading, toast, notify, reload, adjustQty, addProduct, updateProduct, deleteProduct, finishShopping, addPlace, addCategory, updateCategory, deleteCategory, updatePlace, deletePlace, renameHousehold],
+    [household, places, categories, products, loading, toast, notify, reload, adjustQty, addProduct, updateProduct, deleteProduct, finishShopping, checkItem, uncheckItem, addPlace, addCategory, updateCategory, deleteCategory, updatePlace, deletePlace, renameHousehold],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

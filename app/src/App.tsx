@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { InventoryProvider, useInventory } from './lib/inventory'
 import { lookupBarcode } from './lib/barcode'
-import { onShoppingList } from './lib/logic'
+import { toBuy } from './lib/logic'
 import type { Product } from './lib/types'
 import { Login } from './screens/Login'
 import { Onboarding } from './screens/Onboarding'
@@ -97,7 +97,7 @@ function Shell() {
     [products, notify, stockPlace],
   )
 
-  const listCount = products.filter(onShoppingList).length
+  const listCount = products.filter(toBuy).length
 
   return (
     <div className="app">

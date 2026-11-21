@@ -1,18 +1,31 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useInventory } from '../lib/inventory'
-import { byName, isLow, needed, onShoppingList } from '../lib/logic'
+import { byName, inBasket, isLow, needed, onShoppingList, staleBasket } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
 
 export function Shopping() {
-  const { products, places, updateProduct, addProduct, finishShopping, notify } = useInventory()
+  const { products, places, updateProduct, addProduct, finishShopping, checkItem, uncheckItem, notify } = useInventory()
   const [adding, setAdding] = useState(false)
   const [extra, setExtra] = useState('')
   const [busy, setBusy] = useState(false)
 
   const list = useMemo(() => products.filter(onShoppingList).sort(byName), [products])
   const todo = list.filter((p) => !p.list_checked)
-  const done = list.filter((p) => p.list_checked)
+  const done = list.filter(inBasket)
+
+  // Ruim een mandje van een eerdere boodschappenronde stilletjes op.
+  useEffect(() => {
+    products.filter(staleBasket).forEach((p) => updateProduct(p.id, { list_checked: false, list_checked_at: null, on_list: false, list_qty: null }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function check(p: Product) {
+    const n = needed(p)
+    if ('vibrate' in navigator) navigator.vibrate(30)
+    const row = await checkItem(p.id)
+    if (row) notify(`${p.name}: +${n} in voorraad (nu ${row.qty})`)
+  }
   const pct = list.length ? Math.round((done.length / list.length) * 100) : 0
 
   const extraMatches = useMemo(() => {
@@ -26,7 +39,7 @@ export function Shopping() {
     setBusy(true)
     const n = await finishShopping()
     setBusy(false)
-    notify(n ? `Voorraad bijgewerkt: ${n} ${n === 1 ? 'product' : 'producten'}` : 'Niets afgevinkt')
+    notify(n ? 'Mandje geleegd. Tot de volgende keer!' : 'Het mandje was al leeg')
   }
 
   async function addExtraNew() {
@@ -47,7 +60,7 @@ export function Shopping() {
     <div className="screen with-footer">
       <header className="stack-xs">
         <h1 className="title">Boodschappen</h1>
-        <span className="muted">Vult zich vanzelf met wat bijna op is</span>
+        <span className="muted">Vink af wat je koopt: de voorraad wordt meteen bijgewerkt</span>
       </header>
 
       {list.length > 0 && (
@@ -69,7 +82,7 @@ export function Shopping() {
           <h2 className="eyebrow">Nog halen</h2>
           {todo.map((p) => (
             <div key={p.id} className="shop-row card">
-              <button type="button" className="shop-check" aria-pressed="false" aria-label={`${p.name} in het mandje`} onClick={() => updateProduct(p.id, { list_checked: true })}>
+              <button type="button" className="shop-check" aria-pressed="false" aria-label={`${p.name} in het mandje`} onClick={() => check(p)}>
                 <span className="box" />
                 <span className="shop-text">
                   <strong>{p.name}</strong>
@@ -95,9 +108,9 @@ export function Shopping() {
 
       {done.length > 0 && (
         <section className="stack-sm">
-          <h2 className="eyebrow">In het mandje</h2>
+          <h2 className="eyebrow">In het mandje · al in voorraad</h2>
           {done.map((p) => (
-            <button key={p.id} type="button" className="shop-done" aria-pressed="true" onClick={() => updateProduct(p.id, { list_checked: false })}>
+            <button key={p.id} type="button" className="shop-done" aria-pressed="true" onClick={() => uncheckItem(p.id)} aria-label={`${p.name} terug op het lijstje, voorraad weer −${needed(p)}`}>
               <span className="box on">
                 <Icon name="check" size={16} stroke={3} />
               </span>
@@ -153,7 +166,7 @@ export function Shopping() {
         <div className="footer-cta">
           <button type="button" className="btn-primary" disabled={busy || done.length === 0} onClick={finish}>
             <Icon name="check" size={20} stroke={2.4} />
-            {done.length === 0 ? 'Vink af wat je hebt gekocht' : `Klaar · ${done.length} aanvullen in voorraad`}
+            {done.length === 0 ? 'Vink af wat je in je mandje legt' : `Klaar met boodschappen (${done.length})`}
           </button>
         </div>
       )}

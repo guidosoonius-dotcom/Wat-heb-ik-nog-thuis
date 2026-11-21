@@ -20,8 +20,26 @@ export function isLow(p: Product) {
   return p.qty < p.min_qty
 }
 
+const BASKET_HOURS = 12
+
+// Afgevinkt in de afgelopen uren: staat nog "in het mandje".
+export function inBasket(p: Product) {
+  return p.list_checked && !!p.list_checked_at && Date.now() - new Date(p.list_checked_at).getTime() < BASKET_HOURS * 3600000
+}
+
+// Afgevinkt, maar al lang geleden: het mandje mag worden opgeruimd.
+export function staleBasket(p: Product) {
+  return p.list_checked && !inBasket(p)
+}
+
+// Nog te kopen.
+export function toBuy(p: Product) {
+  return !p.list_checked && (p.on_list || isLow(p))
+}
+
+// Zichtbaar op het lijstje: nog te kopen of net gekocht.
 export function onShoppingList(p: Product) {
-  return p.on_list || isLow(p)
+  return toBuy(p) || inBasket(p)
 }
 
 export function needed(p: Product) {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useInventory } from '../lib/inventory'
-import { byName, expirySoon, isLow, onShoppingList, todayLabel } from '../lib/logic'
+import { byName, expirySoon, isLow, toBuy, todayLabel } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
 import { ProductRow } from '../components/ProductRow'
@@ -19,7 +19,7 @@ export function Home({ onOpen, onScan, onShowPlace, onShowList, onShowHousehold 
   const [query, setQuery] = useState('')
 
   const low = useMemo(() => products.filter(isLow).sort((a, b) => a.qty - b.qty || byName(a, b)), [products])
-  const listCount = useMemo(() => products.filter(onShoppingList).length, [products])
+  const listCount = useMemo(() => products.filter(toBuy).length, [products])
   const expiring = useMemo(() => products.filter(expirySoon).length, [products])
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()

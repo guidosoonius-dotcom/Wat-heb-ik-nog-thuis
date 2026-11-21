@@ -28,6 +28,7 @@ export interface Product {
   on_list: boolean
   list_qty: number | null
   list_checked: boolean
+  list_checked_at: string | null
   updated_at: string
 }
 
