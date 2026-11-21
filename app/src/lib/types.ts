@@ -29,6 +29,12 @@ export interface Product {
   list_qty: number | null
   list_checked: boolean
   list_checked_at: string | null
+  image_url: string | null
+  size_label: string | null
+  pao_months: number | null
+  opened_at: string | null
+  store: string | null
+  use_rate: number | null
   updated_at: string
 }
 
@@ -36,6 +42,7 @@ export interface Household {
   id: string
   name: string
   invite_code: string
+  shortcut_token: string
 }
 
 export type Status = 'ok' | 'low' | 'out' | 'none'

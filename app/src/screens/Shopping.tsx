@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useInventory } from '../lib/inventory'
-import { byName, inBasket, isLow, needed, onShoppingList, staleBasket } from '../lib/logic'
+import { byName, daysLeft, inBasket, isLow, needed, onShoppingList, predictedLow, staleBasket } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
 
@@ -13,6 +13,36 @@ export function Shopping() {
   const list = useMemo(() => products.filter(onShoppingList).sort(byName), [products])
   const todo = list.filter((p) => !p.list_checked)
   const done = list.filter(inBasket)
+
+  // Groepeer per winkel (meest gebruikte eerst); producten zonder winkel onder "Overal".
+  const groups = useMemo(() => {
+    const map = new Map<string, Product[]>()
+    for (const p of todo) {
+      const key = p.store ?? 'Overal'
+      map.set(key, [...(map.get(key) ?? []), p])
+    }
+    return Array.from(map, ([store, items]) => ({ store, items })).sort((a, b) =>
+      a.store === 'Overal' ? 1 : b.store === 'Overal' ? -1 : b.items.length - a.items.length,
+    )
+  }, [todo])
+
+  async function share() {
+    const lines = groups.flatMap((g) => [
+      ...(groups.length > 1 ? [`*${g.store}*`] : []),
+      ...g.items.map((p) => `• ${p.name}${needed(p) > 1 ? ` (${needed(p)}x)` : ''}`),
+      ...(groups.length > 1 ? [''] : []),
+    ])
+    const text = `Boodschappenlijstje\n${lines.join('\n').trim()}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ text })
+      } catch {
+        /* geannuleerd */
+      }
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    }
+  }
 
   // Ruim een mandje van een eerdere boodschappenronde stilletjes op.
   useEffect(() => {
@@ -79,28 +109,42 @@ export function Shopping() {
 
       {todo.length > 0 && (
         <section className="stack-sm">
-          <h2 className="eyebrow">Nog halen</h2>
-          {todo.map((p) => (
-            <div key={p.id} className="shop-row card">
-              <button type="button" className="shop-check" aria-pressed="false" aria-label={`${p.name} in het mandje`} onClick={() => check(p)}>
-                <span className="box" />
-                <span className="shop-text">
-                  <strong>{p.name}</strong>
-                  <small>
-                    {placeOf(p)?.name ?? 'Zonder plek'} · nog {p.qty} thuis
-                    {!isLow(p) && p.on_list ? ' · extra' : ''}
-                  </small>
-                </span>
-              </button>
-              <div className="amount" style={{ background: placeOf(p)?.color ?? '#EEECE7' }}>
-                <button type="button" aria-label={`Minder ${p.name}`} onClick={() => setAmount(p, needed(p) - 1)} disabled={needed(p) <= 1}>
-                  <Icon name="minus" size={14} stroke={2.6} />
-                </button>
-                <span>+{needed(p)}</span>
-                <button type="button" aria-label={`Meer ${p.name}`} onClick={() => setAmount(p, needed(p) + 1)}>
-                  <Icon name="plus" size={14} stroke={2.6} />
-                </button>
-              </div>
+          <div className="section-head">
+            <h2 className="eyebrow">Nog halen</h2>
+            <button type="button" className="link share-link" onClick={share}>
+              <Icon name="share" size={16} /> Deel lijstje
+            </button>
+          </div>
+          {groups.map((g) => (
+            <div key={g.store} className="stack-sm">
+              {groups.length > 1 && (
+                <h3 className="subhead">
+                  {g.store} <small>{g.items.length}</small>
+                </h3>
+              )}
+              {g.items.map((p) => (
+                <div key={p.id} className="shop-row card">
+                  <button type="button" className="shop-check" aria-pressed="false" aria-label={`${p.name} in het mandje`} onClick={() => check(p)}>
+                    <span className="box" />
+                    <span className="shop-text">
+                      <strong>{p.name}</strong>
+                      <small>
+                        {placeOf(p)?.name ?? 'Zonder plek'} · nog {p.qty} thuis
+                        {predictedLow(p) ? ` · bijna op (± ${daysLeft(p)} d)` : !isLow(p) && p.on_list ? ' · extra' : ''}
+                      </small>
+                    </span>
+                  </button>
+                  <div className="amount" style={{ background: placeOf(p)?.color ?? '#EEECE7' }}>
+                    <button type="button" aria-label={`Minder ${p.name}`} onClick={() => setAmount(p, needed(p) - 1)} disabled={needed(p) <= 1}>
+                      <Icon name="minus" size={14} stroke={2.6} />
+                    </button>
+                    <span>+{needed(p)}</span>
+                    <button type="button" aria-label={`Meer ${p.name}`} onClick={() => setAmount(p, needed(p) + 1)}>
+                      <Icon name="plus" size={14} stroke={2.6} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </section>

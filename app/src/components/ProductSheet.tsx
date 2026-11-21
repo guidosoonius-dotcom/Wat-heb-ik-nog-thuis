@@ -9,6 +9,7 @@ import type { Suggestion } from '../lib/suggest'
 import type { Product } from '../lib/types'
 import { Icon } from './Icon'
 import { Stepper } from './ProductRow'
+import { addMonths, suggestedMin, todayIso } from '../lib/logic'
 const Scanner = lazy(() => import('./Scanner').then((m) => ({ default: m.Scanner })))
 
 export interface SheetRequest {
@@ -19,6 +20,8 @@ export interface SheetRequest {
   info?: BarcodeInfo | null
 }
 
+const DEFAULT_STORES = ['Albert Heijn', 'Jumbo', 'Lidl', 'Kruidvat', 'Etos', 'Action']
+const PAO_OPTIONS = [1, 3, 6, 9, 12, 18, 24, 36]
 const NEW_PLACE_COLORS = ['#F7DEDD', '#DDEFF0', '#E1E7F5', '#F3E6D8', '#E8E4DA', '#EAE3F3']
 
 export function ProductSheet({ request, onClose, onOpenProduct }: { request: SheetRequest; onClose: () => void; onOpenProduct: (p: Product) => void }) {
@@ -32,6 +35,12 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
   const [expiry, setExpiry] = useState(editing?.expiry_date ?? '')
   const [barcode, setBarcode] = useState(editing?.barcode ?? request.barcode ?? null)
   const [onList, setOnList] = useState(editing?.on_list ?? false)
+  const [imageUrl, setImageUrl] = useState<string | null>(editing?.image_url ?? request.info?.imageUrl ?? null)
+  const [sizeLabel, setSizeLabel] = useState<string | null>(editing?.size_label ?? request.info?.size ?? null)
+  const [paoMonths, setPaoMonths] = useState<number | null>(editing?.pao_months ?? request.info?.paoMonths ?? null)
+  const [openedAt, setOpenedAt] = useState<string | null>(editing?.opened_at ?? null)
+  const [store, setStore] = useState<string | null>(editing?.store ?? null)
+  const [newStore, setNewStore] = useState<string | null>(null)
   const [categoryId, setCategoryId] = useState<string | null>(editing?.category_id ?? null)
   const [info, setInfo] = useState<BarcodeInfo | null>(request.info ?? null)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
@@ -155,7 +164,24 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
         setName(found.name)
         setTouched(false)
         setInfo(found)
+        setImageUrl(found.imageUrl)
+        setSizeLabel(found.size)
+        if (found.paoMonths) setPaoMonths(found.paoMonths)
       } else notify('Barcode niet gevonden. Typ zelf een naam.')
+    }
+  }
+
+  const stores = useMemo(() => {
+    const used = products.map((p) => p.store).filter((x): x is string => !!x)
+    return Array.from(new Set([...used, ...DEFAULT_STORES])).slice(0, 10)
+  }, [products])
+  const minHint = editing ? suggestedMin(editing) : null
+
+  function setOpened(date: string | null, pao = paoMonths) {
+    setOpenedAt(date)
+    if (date && pao) {
+      setExpiry(addMonths(date, pao))
+      setExpiryOn(true)
     }
   }
 
@@ -171,6 +197,11 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
       expiry_date: expiryOn && expiry ? expiry : null,
       barcode,
       on_list: onList,
+      image_url: imageUrl,
+      size_label: sizeLabel?.trim() || null,
+      pao_months: paoMonths,
+      opened_at: openedAt,
+      store,
     }
     if (editing) {
       await updateProduct(editing.id, fields)
@@ -237,6 +268,20 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
         )}
 
         <div className="card form">
+          {(imageUrl || sizeLabel) && (
+            <div className="product-preview">
+              {imageUrl && <img src={imageUrl} alt="" />}
+              <div>
+                <span className="muted small">Uit de barcode</span>
+                {sizeLabel && <strong>{sizeLabel}</strong>}
+              </div>
+              {imageUrl && (
+                <button type="button" className="link" onClick={() => setImageUrl(null)}>
+                  Foto weg
+                </button>
+              )}
+            </div>
+          )}
           <label className="field">
             <span>Naam</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bijv. tandpasta" autoComplete="off" />
@@ -339,6 +384,39 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
             </div>
           </div>
           <p className="hint">Onder het minimum komt het vanzelf op het lijstje.</p>
+          {minHint !== null && minHint !== min && (
+            <button type="button" className="suggest-hint as-button" onClick={() => setMin(minHint)}>
+              <Icon name="sparkle" size={14} /> Jullie verbruik: minimum {minHint} dekt ±10 dagen. <u>Gebruik {minHint}</u>
+            </button>
+          )}
+
+          <label className="field">
+            <span>Inhoud <span className="muted">(optioneel)</span></span>
+            <input type="text" value={sizeLabel ?? ''} onChange={(e) => setSizeLabel(e.target.value)} placeholder="Bijv. 500 g of 6 rollen" />
+          </label>
+
+          <div className="field">
+            <span>Meestal gekocht bij <span className="muted">(optioneel)</span></span>
+            <div className="chips" role="group" aria-label="Winkel">
+              {stores.map((st) => (
+                <button key={st} type="button" aria-pressed={store === st} className={`chip ${store === st ? 'on' : ''}`} onClick={() => setStore(store === st ? null : st)}>
+                  {st}
+                </button>
+              ))}
+              {newStore === null ? (
+                <button type="button" className="chip chip-dashed" onClick={() => setNewStore('')}>
+                  <Icon name="plus" size={14} stroke={2.6} /> Andere winkel
+                </button>
+              ) : (
+                <div className="inline-add">
+                  <input autoFocus value={newStore} onChange={(e) => setNewStore(e.target.value)} placeholder="Naam winkel" aria-label="Naam winkel" />
+                  <button type="button" className="btn-secondary small" disabled={!newStore.trim()} onClick={() => { setStore(newStore.trim()); setNewStore(null) }}>
+                    OK
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           <button type="button" className="switch-row" aria-pressed={expiryOn} onClick={() => setExpiryOn(!expiryOn)}>
             <span>
@@ -352,10 +430,46 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
             </span>
           </button>
           {expiryOn && (
-            <label className="field">
-              <span>Houdbaar tot</span>
-              <input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
-            </label>
+            <>
+              <label className="field">
+                <span>Houdbaar tot</span>
+                <input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+              </label>
+              <div className="grid-2">
+                <label className="field">
+                  <span>Na openen houdbaar</span>
+                  <select
+                    value={paoMonths ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value ? Number(e.target.value) : null
+                      setPaoMonths(v)
+                      if (openedAt && v) setOpened(openedAt, v)
+                    }}
+                  >
+                    <option value="">Onbekend</option>
+                    {PAO_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m} {m === 1 ? 'maand' : 'maanden'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="field">
+                  <span>Geopend op</span>
+                  {openedAt ? (
+                    <input type="date" value={openedAt} onChange={(e) => setOpened(e.target.value || null)} />
+                  ) : (
+                    <button type="button" className="btn-secondary small" onClick={() => setOpened(todayIso())}>
+                      Vandaag geopend
+                    </button>
+                  )}
+                </div>
+              </div>
+              {paoMonths && openedAt && <p className="hint">Houdbaar tot {addMonths(openedAt, paoMonths)} na openen; de datum hierboven is aangepast.</p>}
+            </>
+          )}
+          {!expiryOn && paoMonths && (
+            <p className="hint">Na openen {paoMonths} maanden houdbaar (uit de barcode). Zet houdbaarheid aan om dit bij te houden.</p>
           )}
 
           {editing && (

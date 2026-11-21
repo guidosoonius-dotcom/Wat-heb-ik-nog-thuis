@@ -16,6 +16,18 @@ export const STATUS_LABEL: Record<Status, string> = {
   none: 'Niet in huis',
 }
 
+export function addMonths(date: string, months: number) {
+  const d = new Date(date + 'T00:00:00')
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
+export function todayIso() {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
+
 export function isLow(p: Product) {
   return p.qty < p.min_qty
 }
@@ -32,9 +44,29 @@ export function staleBasket(p: Product) {
   return p.list_checked && !inBasket(p)
 }
 
+export const PREDICT_DAYS = 7
+
+// Geschat aantal dagen tot op, op basis van het geleerde verbruik.
+export function daysLeft(p: Product): number | null {
+  if (!p.use_rate || p.use_rate <= 0) return null
+  return Math.floor(p.qty / p.use_rate)
+}
+
+// Nog boven het minimum, maar volgens het verbruik binnenkort op.
+export function predictedLow(p: Product) {
+  const d = daysLeft(p)
+  return !isLow(p) && p.qty > 0 && d !== null && d <= PREDICT_DAYS
+}
+
+// Minimum dat ongeveer 10 dagen verbruik dekt.
+export function suggestedMin(p: Product): number | null {
+  if (!p.use_rate) return null
+  return Math.max(1, Math.ceil(p.use_rate * 10))
+}
+
 // Nog te kopen.
 export function toBuy(p: Product) {
-  return !p.list_checked && (p.on_list || isLow(p))
+  return !p.list_checked && (p.on_list || isLow(p) || predictedLow(p))
 }
 
 // Zichtbaar op het lijstje: nog te kopen of net gekocht.

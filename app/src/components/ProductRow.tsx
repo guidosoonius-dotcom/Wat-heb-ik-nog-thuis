@@ -1,5 +1,5 @@
 import { useInventory } from '../lib/inventory'
-import { STATUS_LABEL, expiryLabel, expirySoon, statusOf } from '../lib/logic'
+import { PREDICT_DAYS, STATUS_LABEL, daysLeft, expiryLabel, expirySoon, statusOf } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from './Icon'
 
@@ -22,12 +22,17 @@ export function ProductRow({ product, onOpen, showPlace }: { product: Product; o
   const status = statusOf(product)
   const place = places.find((pl) => pl.id === product.place_id)
   const category = categories.find((c) => c.id === product.category_id)
+  const days = daysLeft(product)
   return (
     <div className="row card">
-      {showPlace && (
-        <span className="row-tint" style={{ background: place?.color ?? '#EEECE7' }} aria-hidden="true">
-          {product.name.charAt(0).toUpperCase()}
-        </span>
+      {product.image_url ? (
+        <img className="row-thumb" src={product.image_url} alt="" loading="lazy" />
+      ) : (
+        showPlace && (
+          <span className="row-tint" style={{ background: place?.color ?? '#EEECE7' }} aria-hidden="true">
+            {product.name.charAt(0).toUpperCase()}
+          </span>
+        )
       )}
       <button type="button" className="row-main" onClick={() => onOpen(product)}>
         <span className="row-name">{product.name}</span>
@@ -38,6 +43,12 @@ export function ProductRow({ product, onOpen, showPlace }: { product: Product; o
           </span>
           {showPlace && place && <span className="muted">· {place.name}{category ? ` › ${category.name}` : ''}</span>}
           {!showPlace && <span className="muted">min. {product.min_qty}</span>}
+          {product.size_label && <span className="muted">· {product.size_label}</span>}
+          {days !== null && status !== 'out' && (
+            <span className={`badge ${days <= PREDICT_DAYS ? 'badge-warn' : ''}`} title="Geschat op basis van jullie verbruik">
+              ± {days} {days === 1 ? 'dag' : 'dagen'}
+            </span>
+          )}
           {product.expiry_date && (
             <span className={`badge ${expirySoon(product) ? 'badge-warn' : ''}`}>
               <Icon name="calendar" size={12} stroke={2.4} />

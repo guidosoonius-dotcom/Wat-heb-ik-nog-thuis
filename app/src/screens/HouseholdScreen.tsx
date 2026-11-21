@@ -44,6 +44,16 @@ export function HouseholdScreen() {
     }
   }
 
+  async function copyShortcut() {
+    const url = `https://qskaepckyhgysnweqzrf.supabase.co/functions/v1/quick-add?token=${household!.shortcut_token}&naam=`
+    try {
+      await navigator.clipboard.writeText(url)
+      notify('Link gekopieerd')
+    } catch {
+      window.prompt('Kopieer deze link:', url)
+    }
+  }
+
   async function togglePush() {
     setPushBusy(true)
     try {
@@ -91,7 +101,7 @@ export function HouseholdScreen() {
 
       <section className="card form">
         <h2 className="h3">Meldingen</h2>
-        <p className="hint">Krijg een seintje zodra iets binnen 30 dagen verloopt.</p>
+        <p className="hint">Een seintje zodra iets binnen 30 dagen verloopt, en elke zaterdagochtend een weekoverzicht van het lijstje.</p>
         {needsInstall ? (
           <p className="notice static">Zet de app eerst op je beginscherm (Deel → Zet op beginscherm) en open hem van daaruit. Dan kun je meldingen aanzetten.</p>
         ) : !pushSupported() ? (
@@ -106,6 +116,22 @@ export function HouseholdScreen() {
             </span>
           </button>
         )}
+      </section>
+
+      <section className="card form">
+        <h2 className="h3">Siri: "zet op het lijstje"</h2>
+        <p className="hint">Zeg bijvoorbeeld "Hé Siri, op het lijstje" en daarna "tandpasta". Zo maak je de snelkoppeling eenmalig aan in de app Opdrachten:</p>
+        <ol className="steps">
+          <li>Tik hieronder op <strong>Kopieer link</strong>.</li>
+          <li>Open <strong>Opdrachten</strong> → <strong>+</strong> → noem hem <strong>Op het lijstje</strong>.</li>
+          <li>Voeg <strong>Dicteer tekst</strong> toe.</li>
+          <li>Voeg <strong>Haal inhoud van URL op</strong> toe en plak de link. Zet er de variabele <em>Gedicteerde tekst</em> direct achter.</li>
+          <li>Voeg <strong>Toon resultaat</strong> toe. Siri leest dan voor wat er gebeurd is.</li>
+        </ol>
+        <button type="button" className="btn-secondary" onClick={copyShortcut}>
+          <Icon name="share" size={18} /> Kopieer link
+        </button>
+        <p className="hint">Deel deze link niet buiten jullie huishouden: iedereen met de link kan iets op jullie lijstje zetten.</p>
       </section>
 
       <section className="card form">

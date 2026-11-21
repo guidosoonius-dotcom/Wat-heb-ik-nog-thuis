@@ -1,4 +1,5 @@
-// Dagelijkse controle: stuurt een pushmelding voor producten die binnen 30 dagen verlopen.
+// Dagelijks: pushmelding voor producten die binnen 30 dagen verlopen.
+// Wekelijks (body {"mode":"weekly"}): overzicht van het lijstje en wat binnenkort verloopt.
 // Wordt aangeroepen door pg_cron (zie supabase/migrations) met een gedeeld geheim.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
@@ -12,6 +13,9 @@ Deno.serve(async (req) => {
   if (req.headers.get('x-cron-secret') !== cfg.cron_secret) return new Response('forbidden', { status: 403 })
 
   webpush.setVapidDetails(cfg.vapid_subject, cfg.vapid_public, cfg.vapid_private)
+
+  const body = await req.json().catch(() => ({}))
+  if (body?.mode === 'weekly') return weekly(supabase)
 
   const limit = new Date(Date.now() + DAYS * 86400000).toISOString().slice(0, 10)
   const { data: due, error } = await supabase
@@ -48,3 +52,38 @@ Deno.serve(async (req) => {
   }
   return Response.json({ sent })
 })
+
+// Wekelijks overzicht: wat moet er gehaald worden en wat verloopt binnenkort.
+async function weekly(supabase: ReturnType<typeof createClient>) {
+  const { data: products } = await supabase
+    .from('products')
+    .select('household_id, name, qty, min_qty, on_list, list_checked, expiry_date, use_rate')
+  const soon = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+  const byHh = new Map<string, { buy: string[]; expiring: string[] }>()
+  for (const p of products ?? []) {
+    const e = byHh.get(p.household_id) ?? { buy: [], expiring: [] }
+    const predicted = p.use_rate && p.qty > 0 && p.qty >= p.min_qty && p.qty / p.use_rate <= 7
+    if (!p.list_checked && (p.on_list || p.qty < p.min_qty || predicted)) e.buy.push(p.name)
+    if (p.expiry_date && p.expiry_date <= soon) e.expiring.push(p.name)
+    byHh.set(p.household_id, e)
+  }
+  let sent = 0
+  for (const [hh, { buy, expiring }] of byHh) {
+    if (!buy.length && !expiring.length) continue
+    const parts: string[] = []
+    if (buy.length) parts.push(`${buy.length} op het lijstje (${buy.slice(0, 3).join(', ')}${buy.length > 3 ? '…' : ''})`)
+    if (expiring.length) parts.push(`${expiring.length} verloopt binnen 2 weken`)
+    const payload = JSON.stringify({ title: 'Weekoverzicht', body: parts.join(' · '), url: '/' })
+    const { data: subs } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('household_id', hh)
+    for (const s of subs ?? []) {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+        sent++
+      } catch (e) {
+        const code = (e as { statusCode?: number }).statusCode
+        if (code === 404 || code === 410) await supabase.from('push_subscriptions').delete().eq('id', s.id)
+      }
+    }
+  }
+  return Response.json({ sent, mode: 'weekly' })
+}

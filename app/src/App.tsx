@@ -17,6 +17,7 @@ import { ProductSheet } from './components/ProductSheet'
 import type { SheetRequest } from './components/ProductSheet'
 const Scanner = lazy(() => import('./components/Scanner').then((m) => ({ default: m.Scanner })))
 import { Icon } from './components/Icon'
+import { ScanAction } from './components/ScanAction'
 import { Logo } from './components/Logo'
 
 type Tab = 'home' | 'stock' | 'list' | 'household'
@@ -67,12 +68,13 @@ export default function App() {
 }
 
 function Shell() {
-  const { products, loading, toast, notify } = useInventory()
+  const { products, loading, toast, notify, offline, pending } = useInventory()
   const [tab, setTab] = useState<Tab>('home')
   const [stockPlace, setStockPlace] = useState<string | null>(null)
   const [stockFilter, setStockFilter] = useState<StockFilter>('all')
   const [sheet, setSheet] = useState<SheetRequest | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [action, setAction] = useState<string | null>(null)
 
   const open = useCallback((p: Product) => setSheet({ product: p }), [])
 
@@ -86,7 +88,7 @@ function Shell() {
       setScanning(false)
       const found = products.find((p) => p.barcode === code)
       if (found) {
-        setSheet({ product: found })
+        setAction(found.id)
         return
       }
       notify('Product opzoeken…')
@@ -101,6 +103,11 @@ function Shell() {
 
   return (
     <div className="app">
+      {offline && (
+        <div className="offline-bar" role="status">
+          Geen verbinding{pending ? ` · ${pending} ${pending === 1 ? 'wijziging' : 'wijzigingen'} bewaard` : ''}. Wordt verstuurd zodra je weer online bent.
+        </div>
+      )}
       <main className="content">
         {loading ? (
           <div className="splash inline">
@@ -146,9 +153,19 @@ function Shell() {
       </nav>
 
       {sheet && <ProductSheet key={sheet.product?.id ?? 'new'} request={sheet} onClose={() => setSheet(null)} onOpenProduct={open} />}
+      {action && (
+        <ScanAction
+          productId={action}
+          onClose={() => setAction(null)}
+          onEdit={(p) => {
+            setAction(null)
+            setSheet({ product: p })
+          }}
+        />
+      )}
       {scanning && <Suspense fallback={null}><Scanner onResult={onScan} onClose={() => setScanning(false)} /></Suspense>}
       {toast && (
-        <div className="toast" role="status">
+        <div className={`toast ${offline ? 'below-bar' : ''}`} role="status">
           {toast}
         </div>
       )}
