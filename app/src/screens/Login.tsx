@@ -9,7 +9,14 @@ export function Login() {
   const [code, setCode] = useState('')
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search.slice(1))
+    if (!params.get('error')) return null
+    window.history.replaceState(null, '', window.location.pathname)
+    return params.get('error_code') === 'otp_expired'
+      ? 'Deze inloglink is verlopen of al gebruikt. Vraag hieronder een nieuwe aan.'
+      : 'Inloggen via de link lukte niet. Vraag hieronder een nieuwe aan.'
+  })
 
   async function sendCode(e: FormEvent) {
     e.preventDefault()
