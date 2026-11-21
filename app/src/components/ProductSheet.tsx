@@ -1,8 +1,11 @@
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { CATALOG, CATEGORIES } from '../lib/catalog'
 import type { CatalogCategory, CatalogItem } from '../lib/catalog'
 import { useInventory } from '../lib/inventory'
 import { lookupBarcode } from '../lib/barcode'
+import type { BarcodeInfo } from '../lib/barcode'
+import { suggestPlace } from '../lib/suggest'
+import type { Suggestion } from '../lib/suggest'
 import type { Product } from '../lib/types'
 import { Icon } from './Icon'
 import { Stepper } from './ProductRow'
@@ -13,10 +16,13 @@ export interface SheetRequest {
   name?: string
   barcode?: string
   placeId?: string | null
+  info?: BarcodeInfo | null
 }
 
+const NEW_PLACE_COLORS = ['#F7DEDD', '#DDEFF0', '#E1E7F5', '#F3E6D8', '#E8E4DA', '#EAE3F3']
+
 export function ProductSheet({ request, onClose, onOpenProduct }: { request: SheetRequest; onClose: () => void; onOpenProduct: (p: Product) => void }) {
-  const { places, products, addProduct, updateProduct, deleteProduct, notify } = useInventory()
+  const { places, categories, products, addProduct, updateProduct, deleteProduct, addPlace, addCategory, notify } = useInventory()
   const editing = request.product
   const [name, setName] = useState(editing?.name ?? request.name ?? '')
   const [placeId, setPlaceId] = useState<string | null>(editing?.place_id ?? request.placeId ?? places[0]?.id ?? null)
@@ -26,6 +32,13 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
   const [expiry, setExpiry] = useState(editing?.expiry_date ?? '')
   const [barcode, setBarcode] = useState(editing?.barcode ?? request.barcode ?? null)
   const [onList, setOnList] = useState(editing?.on_list ?? false)
+  const [categoryId, setCategoryId] = useState<string | null>(editing?.category_id ?? null)
+  const [info, setInfo] = useState<BarcodeInfo | null>(request.info ?? null)
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
+  const [hint, setHint] = useState<string | null>(null)
+  const [touched, setTouched] = useState(!!editing || !!request.placeId)
+  const [newCat, setNewCat] = useState<string | null>(null)
+  const [newPlace, setNewPlace] = useState<string | null>(null)
   const [cat, setCat] = useState<CatalogCategory>('Verzorging')
   const [scanning, setScanning] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -40,11 +53,91 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
     return list.filter((c) => !existingNames.has(c.name.toLowerCase())).slice(0, 18)
   }, [name, cat, existingNames])
 
+  const placeName = (id: string | null) => places.find((p) => p.id === id)?.name
+  const catName = (id: string | null) => categories.find((c) => c.id === id)?.name
+  const placeCategories = categories.filter((c) => c.place_id === placeId)
+  const pending = suggestion && (!('id' in suggestion.place) || (suggestion.category && !('id' in suggestion.category))) ? suggestion : null
+
+  function apply(s: Suggestion | null) {
+    setSuggestion(s)
+    setHint(null)
+    if (!s || !('id' in s.place)) return
+    setPlaceId(s.place.id)
+    const cid = s.category && 'id' in s.category ? s.category.id : null
+    setCategoryId(cid)
+    if (!s.category || 'id' in s.category) {
+      const label = [placeName(s.place.id), catName(cid)].filter(Boolean).join(' › ')
+      setHint(`Voorgesteld: ${label} (${s.reason})`)
+    }
+  }
+
+  // Stel automatisch een plek en categorie voor zolang de gebruiker die niet zelf heeft gekozen.
+  useEffect(() => {
+    if (touched) return
+    const t = window.setTimeout(() => apply(suggestPlace({ name, info }, places, categories, products)), info ? 0 : 450)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, info, touched])
+
+  async function acceptSuggestion() {
+    if (!pending) return
+    let pid: string | null = 'id' in pending.place ? pending.place.id : null
+    if (!pid && 'create' in pending.place) {
+      const c = pending.place.create
+      pid = (await addPlace(c.name, c.color, c.icon))?.id ?? null
+      if (pid) notify(`Nieuwe plek: ${c.name}`)
+    }
+    if (!pid) return
+    let cid: string | null = null
+    if (pending.category) {
+      if ('id' in pending.category) cid = pending.category.id
+      else {
+        cid = (await addCategory(pid, pending.category.create))?.id ?? null
+        if (cid) notify(`Nieuwe categorie: ${pending.category.create}`)
+      }
+    }
+    setPlaceId(pid)
+    setCategoryId(cid)
+    setSuggestion(null)
+    setTouched(true)
+  }
+
+  function choosePlace(id: string) {
+    setTouched(true)
+    setSuggestion(null)
+    setHint(null)
+    setPlaceId(id)
+    if (!categories.some((c) => c.id === categoryId && c.place_id === id)) setCategoryId(null)
+  }
+
+  async function createPlace() {
+    const n = newPlace?.trim()
+    if (!n) return
+    const pl = await addPlace(n, NEW_PLACE_COLORS[places.length % NEW_PLACE_COLORS.length])
+    if (pl) choosePlace(pl.id)
+    setNewPlace(null)
+  }
+
+  async function createCategory() {
+    const n = newCat?.trim()
+    if (!n || !placeId) return
+    const c = await addCategory(placeId, n)
+    if (c) setCategoryId(c.id)
+    setNewCat(null)
+    setTouched(true)
+  }
+
   function pick(item: CatalogItem) {
     setName(item.name)
     setMin(item.min)
-    const pl = places.find((p) => p.name.toLowerCase() === item.place.toLowerCase())
-    if (pl) setPlaceId(pl.id)
+    const s = suggestPlace({ name: item.name }, places, categories, products)
+    if (s) {
+      apply(s)
+    } else {
+      const pl = places.find((p) => p.name.toLowerCase() === item.place.toLowerCase())
+      if (pl) setPlaceId(pl.id)
+    }
+    setTouched(true)
   }
 
   async function onScan(code: string) {
@@ -57,9 +150,12 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
     }
     if (!name.trim()) {
       notify('Product opzoeken…')
-      const n = await lookupBarcode(code)
-      if (n) setName(n)
-      else notify('Barcode niet gevonden. Typ zelf een naam.')
+      const found = await lookupBarcode(code)
+      if (found) {
+        setName(found.name)
+        setTouched(false)
+        setInfo(found)
+      } else notify('Barcode niet gevonden. Typ zelf een naam.')
     }
   }
 
@@ -69,6 +165,7 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
     const fields = {
       name: name.trim(),
       place_id: placeId,
+      category_id: categories.some((c) => c.id === categoryId && c.place_id === placeId) ? categoryId : null,
       qty,
       min_qty: min,
       expiry_date: expiryOn && expiry ? expiry : null,
@@ -93,7 +190,6 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
     onClose()
   }
 
-  const placeName = places.find((p) => p.id === placeId)?.name
 
   return (
     <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
@@ -151,16 +247,86 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
             </button>
           )}
 
+          {pending && (
+            <div className="proposal" role="status">
+              <Icon name="sparkle" size={18} />
+              <div className="proposal-text">
+                <strong>
+                  {'create' in pending.place
+                    ? `Nieuwe plek “${pending.place.create.name}”${pending.category && 'create' in pending.category ? ` met categorie “${pending.category.create}”` : ''}?`
+                    : `Nieuwe categorie “${pending.category && 'create' in pending.category ? pending.category.create : ''}” in ${placeName(pending.place.id)}?`}
+                </strong>
+                <small>Dit lijkt een {pending.reason}.</small>
+                <div className="proposal-actions">
+                  <button type="button" className="btn-secondary small" onClick={acceptSuggestion}>
+                    Aanmaken
+                  </button>
+                  <button type="button" className="btn-ghost small" onClick={() => { setSuggestion(null); setTouched(true) }}>
+                    Nee, zelf kiezen
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {hint && !pending && (
+            <p className="suggest-hint">
+              <Icon name="sparkle" size={14} /> {hint}
+            </p>
+          )}
+
           <div className="field">
             <span>Plek</span>
             <div className="place-picker" role="group" aria-label="Plek">
               {places.map((p) => (
-                <button key={p.id} type="button" aria-pressed={placeId === p.id} className={placeId === p.id ? 'on' : ''} style={{ background: p.color }} onClick={() => setPlaceId(p.id)}>
+                <button key={p.id} type="button" aria-pressed={placeId === p.id} className={placeId === p.id ? 'on' : ''} style={{ background: p.color }} onClick={() => choosePlace(p.id)}>
                   {p.name}
                 </button>
               ))}
+              {newPlace === null ? (
+                <button type="button" className="add-dashed" onClick={() => setNewPlace('')}>
+                  <Icon name="plus" size={16} stroke={2.4} /> Nieuwe plek
+                </button>
+              ) : (
+                <div className="inline-add span-2">
+                  <input autoFocus value={newPlace} onChange={(e) => setNewPlace(e.target.value)} placeholder="Bijv. vriezer" aria-label="Naam nieuwe plek" onKeyDown={(e) => e.key === 'Enter' && createPlace()} />
+                  <button type="button" className="btn-secondary small" disabled={!newPlace.trim()} onClick={createPlace}>
+                    Maak
+                  </button>
+                  <button type="button" className="icon-btn plain" aria-label="Annuleer" onClick={() => setNewPlace(null)}>
+                    <Icon name="close" size={16} stroke={2.4} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+
+          {placeId && (
+            <div className="field">
+              <span>Categorie <span className="muted">(optioneel)</span></span>
+              <div className="chips" role="group" aria-label="Categorie">
+                {placeCategories.map((c) => (
+                  <button key={c.id} type="button" aria-pressed={categoryId === c.id} className={`chip ${categoryId === c.id ? 'on' : ''}`} onClick={() => { setCategoryId(categoryId === c.id ? null : c.id); setTouched(true); setHint(null) }}>
+                    {c.name}
+                  </button>
+                ))}
+                {newCat === null ? (
+                  <button type="button" className="chip chip-dashed" onClick={() => setNewCat('')}>
+                    <Icon name="plus" size={14} stroke={2.6} /> Nieuw
+                  </button>
+                ) : (
+                  <div className="inline-add">
+                    <input autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Bijv. broodbeleg" aria-label="Naam nieuwe categorie" onKeyDown={(e) => e.key === 'Enter' && createCategory()} />
+                    <button type="button" className="btn-secondary small" disabled={!newCat.trim()} onClick={createCategory}>
+                      Maak
+                    </button>
+                    <button type="button" className="icon-btn plain" aria-label="Annuleer" onClick={() => setNewCat(null)}>
+                      <Icon name="close" size={16} stroke={2.4} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid-2">
             <div className="field">
@@ -228,7 +394,7 @@ export function ProductSheet({ request, onClose, onOpenProduct }: { request: She
 
       <div className="sheet-foot">
         <button type="button" className="btn-primary" disabled={!name.trim() || busy} onClick={save}>
-          {editing ? 'Opslaan' : `Opslaan${placeName ? ` in ${placeName}` : ''}`}
+          {editing ? 'Opslaan' : `Opslaan${placeName(placeId) ? ` in ${placeName(placeId)}` : ''}`}
         </button>
       </div>
 

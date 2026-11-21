@@ -90,9 +90,9 @@ function Shell() {
         return
       }
       notify('Product opzoeken…')
-      const name = await lookupBarcode(code)
-      if (!name) notify('Onbekende barcode. Vul zelf een naam in.')
-      setSheet({ name: name ?? '', barcode: code, placeId: stockPlace })
+      const info = await lookupBarcode(code)
+      if (!info) notify('Onbekende barcode. Vul zelf een naam in.')
+      setSheet({ name: info?.name ?? '', barcode: code, info })
     },
     [products, notify, stockPlace],
   )

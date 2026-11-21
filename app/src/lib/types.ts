@@ -7,10 +7,19 @@ export interface Place {
   sort: number
 }
 
+export interface Category {
+  id: string
+  household_id: string
+  place_id: string
+  name: string
+  sort: number
+}
+
 export interface Product {
   id: string
   household_id: string
   place_id: string | null
+  category_id: string | null
   name: string
   qty: number
   min_qty: number

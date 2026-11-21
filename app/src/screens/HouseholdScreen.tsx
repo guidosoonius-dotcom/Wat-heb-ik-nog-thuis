@@ -7,7 +7,8 @@ import { Icon } from '../components/Icon'
 const COLORS = ['#F6E7D3', '#ECE4F1', '#E3EEDF', '#DCEBF3', '#F7DEDD', '#EEECE7']
 
 export function HouseholdScreen() {
-  const { household, places, products, renameHousehold, addPlace, updatePlace, deletePlace, notify } = useInventory()
+  const { household, places, categories, products, renameHousehold, addPlace, updatePlace, deletePlace, addCategory, deleteCategory, notify } = useInventory()
+  const [catDraft, setCatDraft] = useState<Record<string, string>>({})
   const [members, setMembers] = useState(1)
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
@@ -106,10 +107,11 @@ export function HouseholdScreen() {
       </section>
 
       <section className="card form">
-        <h2 className="h3">Plekken</h2>
+        <h2 className="h3">Plekken en categorieën</h2>
         <div className="stack-xs">
           {places.map((pl) => (
-            <div key={pl.id} className="place-edit">
+            <div key={pl.id} className="stack-xs">
+            <div className="place-edit">
               <button
                 type="button"
                 className="swatch big"
@@ -146,6 +148,38 @@ export function HouseholdScreen() {
               >
                 <Icon name="trash" size={18} />
               </button>
+            </div>
+            <div className="cat-list" aria-label={`Categorieën in ${pl.name}`}>
+              {categories
+                .filter((c) => c.place_id === pl.id)
+                .map((c) => (
+                  <span key={c.id} className="cat-tag">
+                    {c.name}
+                    <button
+                      type="button"
+                      aria-label={`Categorie ${c.name} verwijderen`}
+                      onClick={() => {
+                        const n = products.filter((p) => p.category_id === c.id).length
+                        if (!n || window.confirm(`${c.name} verwijderen? ${n} producten verliezen dan hun categorie.`)) deleteCategory(c.id)
+                      }}
+                    >
+                      <Icon name="close" size={14} stroke={2.4} />
+                    </button>
+                  </span>
+                ))}
+            </div>
+            <form
+              className="cat-add"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const n = catDraft[pl.id]?.trim()
+                if (!n) return
+                addCategory(pl.id, n)
+                setCatDraft({ ...catDraft, [pl.id]: '' })
+              }}
+            >
+              <input value={catDraft[pl.id] ?? ''} onChange={(e) => setCatDraft({ ...catDraft, [pl.id]: e.target.value })} placeholder="Categorie toevoegen" aria-label={`Categorie toevoegen aan ${pl.name}`} />
+            </form>
             </div>
           ))}
         </div>

@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function Stock({ placeId, filter, onChange, onOpen }: Props) {
-  const { products, places } = useInventory()
+  const { products, places, categories } = useInventory()
   const place = places.find((p) => p.id === placeId) ?? null
 
   const items = useMemo(() => {
@@ -31,12 +31,22 @@ export function Stock({ placeId, filter, onChange, onOpen }: Props) {
   const total = products.filter((p) => !placeId || p.place_id === placeId).length
 
   const grouped = useMemo(() => {
-    if (placeId || filter === 'expiry') return null
-    const groups = places.map((pl) => ({ place: pl, items: items.filter((p) => p.place_id === pl.id) }))
-    const orphans = items.filter((p) => !places.some((pl) => pl.id === p.place_id))
-    if (orphans.length) groups.push({ place: { id: 'none', name: 'Zonder plek', color: '#EEECE7' } as never, items: orphans })
-    return groups.filter((g) => g.items.length)
-  }, [items, places, placeId, filter])
+    if (filter === 'expiry') return null
+    const shown = placeId ? places.filter((pl) => pl.id === placeId) : places
+    const groups = shown.map((pl) => {
+      const inPlace = items.filter((p) => p.place_id === pl.id)
+      const cats = categories
+        .filter((c) => c.place_id === pl.id)
+        .map((c) => ({ id: c.id, name: c.name, items: inPlace.filter((p) => p.category_id === c.id) }))
+        .filter((c) => c.items.length)
+      const rest = inPlace.filter((p) => !cats.some((c) => c.id === p.category_id))
+      if (rest.length) cats.push({ id: `${pl.id}-rest`, name: cats.length ? 'Overig' : '', items: rest })
+      return { place: { id: pl.id, name: pl.name, color: pl.color }, cats, count: inPlace.length }
+    })
+    const orphans = placeId ? [] : items.filter((p) => !places.some((pl) => pl.id === p.place_id))
+    if (orphans.length) groups.push({ place: { id: 'none', name: 'Zonder plek', color: '#EEECE7' }, cats: [{ id: 'none-rest', name: '', items: orphans }], count: orphans.length })
+    return groups.filter((g) => g.count)
+  }, [items, places, categories, placeId, filter])
 
   return (
     <div className="screen no-pad">
@@ -79,12 +89,23 @@ export function Stock({ placeId, filter, onChange, onOpen }: Props) {
         {grouped
           ? grouped.map((g) => (
               <section key={g.place.id} className="stack-sm">
-                <h2 className="eyebrow">
-                  <span className="swatch" style={{ background: g.place.color }} />
-                  {g.place.name}
-                </h2>
-                {g.items.map((p) => (
-                  <ProductRow key={p.id} product={p} onOpen={onOpen} />
+                {!placeId && (
+                  <h2 className="eyebrow">
+                    <span className="swatch" style={{ background: g.place.color }} />
+                    {g.place.name}
+                  </h2>
+                )}
+                {g.cats.map((c) => (
+                  <div key={c.id} className="stack-sm">
+                    {c.name && (
+                      <h3 className="subhead">
+                        {c.name} <small>{c.items.length}</small>
+                      </h3>
+                    )}
+                    {c.items.map((p) => (
+                      <ProductRow key={p.id} product={p} onOpen={onOpen} />
+                    ))}
+                  </div>
                 ))}
               </section>
             ))

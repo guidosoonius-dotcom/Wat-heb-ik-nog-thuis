@@ -18,9 +18,10 @@ export function Stepper({ value, onDec, onInc, label }: { value: number; onDec: 
 }
 
 export function ProductRow({ product, onOpen, showPlace }: { product: Product; onOpen: (p: Product) => void; showPlace?: boolean }) {
-  const { adjustQty, places } = useInventory()
+  const { adjustQty, places, categories } = useInventory()
   const status = statusOf(product)
   const place = places.find((pl) => pl.id === product.place_id)
+  const category = categories.find((c) => c.id === product.category_id)
   return (
     <div className="row card">
       {showPlace && (
@@ -35,7 +36,7 @@ export function ProductRow({ product, onOpen, showPlace }: { product: Product; o
             <span className="dot" />
             {STATUS_LABEL[status]}
           </span>
-          {showPlace && place && <span className="muted">· {place.name}</span>}
+          {showPlace && place && <span className="muted">· {place.name}{category ? ` › ${category.name}` : ''}</span>}
           {!showPlace && <span className="muted">min. {product.min_qty}</span>}
           {product.expiry_date && (
             <span className={`badge ${expirySoon(product) ? 'badge-warn' : ''}`}>
