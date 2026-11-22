@@ -3,11 +3,15 @@ import { useInventory } from '../lib/inventory'
 import { byName, daysLeft, inBasket, isLow, needed, onShoppingList, predictedLow, staleBasket } from '../lib/logic'
 import type { Product } from '../lib/types'
 import { Icon } from '../components/Icon'
-import { DealBadge, DealsSection, bestDeals } from '../components/Deals'
+import { DealBadge, DealPicker, DealsSection, bestDeals } from '../components/Deals'
+import { dealsByProduct } from '../lib/deals'
 
 export function Shopping() {
   const { products, places, deals, updateProduct, addProduct, finishShopping, checkItem, uncheckItem, notify } = useInventory()
   const best = useMemo(() => bestDeals(deals, products), [deals, products])
+  const allDeals = useMemo(() => dealsByProduct(deals, products), [deals, products])
+  const [dealFor, setDealFor] = useState<string | null>(null)
+  const otherStores = (id: string) => new Set((allDeals.get(id) ?? []).map((d) => d.store)).size - 1
   const [adding, setAdding] = useState(false)
   const [extra, setExtra] = useState('')
   const [busy, setBusy] = useState(false)
@@ -125,7 +129,8 @@ export function Shopping() {
                 </h3>
               )}
               {g.items.map((p) => (
-                <div key={p.id} className="shop-row card">
+                <div key={p.id} className="shop-item card">
+                <div className="shop-row">
                   <button type="button" className="shop-check" aria-pressed="false" aria-label={`${p.name} in het mandje`} onClick={() => check(p)}>
                     <span className="box" />
                     <span className="shop-text">
@@ -134,7 +139,6 @@ export function Shopping() {
                         {placeOf(p)?.name ?? 'Zonder plek'} · nog {p.qty} thuis
                         {predictedLow(p) ? ` · bijna op (± ${daysLeft(p)} d)` : !isLow(p) && p.on_list ? ' · extra' : ''}
                       </small>
-                      {best.get(p.id) && <DealBadge deal={best.get(p.id)!} />}
                     </span>
                   </button>
                   <div className="amount" style={{ background: placeOf(p)?.color ?? '#EEECE7' }}>
@@ -146,6 +150,12 @@ export function Shopping() {
                       <Icon name="plus" size={14} stroke={2.6} />
                     </button>
                   </div>
+                </div>
+                {best.get(p.id) && (
+                  <div className="shop-deal">
+                    <DealBadge deal={best.get(p.id)!} more={otherStores(p.id)} onClick={() => setDealFor(p.id)} />
+                  </div>
+                )}
                 </div>
               ))}
             </div>
@@ -168,7 +178,8 @@ export function Shopping() {
         </section>
       )}
 
-      <DealsSection />
+      <DealsSection onShowDeals={setDealFor} />
+      {dealFor && <DealPicker productId={dealFor} onClose={() => setDealFor(null)} />}
 
       {list.length === 0 && <p className="empty">Het lijstje is leeg. Alles is op voorraad!</p>}
 

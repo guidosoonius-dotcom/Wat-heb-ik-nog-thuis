@@ -56,13 +56,14 @@ function words(s: string) {
 
 // Hoe goed past een aanbieding bij een product? 0 = niet.
 // Alleen hele woorden of woordbegin: "pasta" past dus wel bij "pastasaus" maar niet bij "tandpasta".
+// Andersom alleen voor meervoud/verkleinvorm (max. 3 letters): "luier" past bij "luiers", maar "appel" niet bij "appelstroop".
 function score(productName: string, title: string) {
   const keys = words(productName).filter((w) => w.length >= 4 && !/^\d/.test(w))
   if (!keys.length) return 0
   const main = [...keys].sort((a, b) => b.length - a.length)[0]
   const t = words(title)
   const hit = (k: string) =>
-    [k, ...(SYNONYMS[k] ?? [])].some((v) => t.some((w) => w === v || w.startsWith(v) || (w.length >= 5 && v.startsWith(w))))
+    [k, ...(SYNONYMS[k] ?? [])].some((v) => t.some((w) => w === v || w.startsWith(v) || (w.length >= 4 && v.startsWith(w) && v.length - w.length <= 3)))
   if (!hit(main)) return 0
   return 1 + keys.filter((k) => k !== main && hit(k)).length
 }
