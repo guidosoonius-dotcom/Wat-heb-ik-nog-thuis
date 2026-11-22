@@ -35,6 +35,7 @@ export interface Product {
   opened_at: string | null
   store: string | null
   use_rate: number | null
+  list_dismissed_qty: number | null
   updated_at: string
 }
 
@@ -58,6 +59,7 @@ export interface Deal {
   url: string | null
   online_only: boolean
   valid_until: string | null
+  size_text?: string | null
 }
 
 export type Status = 'ok' | 'low' | 'out' | 'none'

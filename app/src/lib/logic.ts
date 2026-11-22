@@ -65,8 +65,13 @@ export function suggestedMin(p: Product): number | null {
 }
 
 // Nog te kopen.
+// Van het lijstje gehaald en sindsdien niet verder gezakt.
+export function dismissed(p: Product) {
+  return p.list_dismissed_qty !== null && p.list_dismissed_qty !== undefined && p.qty >= p.list_dismissed_qty
+}
+
 export function toBuy(p: Product) {
-  return !p.list_checked && (p.on_list || isLow(p) || predictedLow(p))
+  return !p.list_checked && (p.on_list || ((isLow(p) || predictedLow(p)) && !dismissed(p)))
 }
 
 // Zichtbaar op het lijstje: nog te kopen of net gekocht.

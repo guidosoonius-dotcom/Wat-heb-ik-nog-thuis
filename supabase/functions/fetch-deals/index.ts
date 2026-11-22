@@ -30,6 +30,7 @@ interface Deal {
   url: string | null
   online_only: boolean
   valid_until: string | null
+  size_text: string | null
   score: number
 }
 
@@ -104,6 +105,7 @@ async function ahDeals(token: string, name: string): Promise<Deal[]> {
     url: `https://www.ah.nl/producten/product/wi${p.webshopId}`,
     online_only: false,
     valid_until: p.bonusEndDate ?? null,
+    size_text: p.salesUnitSize ?? null,
     score: score(name, `${p.title} ${p.subCategory ?? ''}`),
   }))
 }
@@ -147,6 +149,7 @@ async function jumboDeals(name: string): Promise<Deal[]> {
       url: p.link ? `https://www.jumbo.com${p.link}` : null,
       online_only: onlineOnly,
       valid_until: null,
+      size_text: null,
       score: score(name, p.title),
     }
   })
@@ -204,6 +207,7 @@ async function refreshHousehold(supabase: ReturnType<typeof createClient>, house
         url: FLYER_URLS[store] ?? null,
         online_only: false,
         valid_until: f.valid_until,
+        size_text: null,
       })
     }
   }

@@ -56,6 +56,16 @@ export function Shopping() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function removeFromList(p: Product) {
+    const before = { on_list: p.on_list, list_qty: p.list_qty, list_dismissed_qty: p.list_dismissed_qty }
+    const automatic = isLow(p) || predictedLow(p)
+    updateProduct(p.id, { on_list: false, list_qty: null, list_dismissed_qty: automatic ? p.qty : null })
+    notify(automatic ? `${p.name} van het lijstje. Komt terug als de voorraad verder zakt.` : `${p.name} van het lijstje`, {
+      label: 'Ongedaan maken',
+      run: () => updateProduct(p.id, before),
+    })
+  }
+
   async function check(p: Product) {
     const n = needed(p)
     if ('vibrate' in navigator) navigator.vibrate(30)
@@ -150,6 +160,9 @@ export function Shopping() {
                       <Icon name="plus" size={14} stroke={2.6} />
                     </button>
                   </div>
+                  <button type="button" className="remove-btn" aria-label={`${p.name} van het lijstje halen`} onClick={() => removeFromList(p)}>
+                    <Icon name="close" size={16} stroke={2.4} />
+                  </button>
                 </div>
                 {best.get(p.id) && (
                   <div className="shop-deal">

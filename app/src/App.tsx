@@ -165,8 +165,19 @@ function Shell() {
       )}
       {scanning && <Suspense fallback={null}><Scanner onResult={onScan} onClose={() => setScanning(false)} /></Suspense>}
       {toast && (
-        <div className={`toast ${offline ? 'below-bar' : ''}`} role="status">
-          {toast}
+        <div className={`toast ${offline ? 'below-bar' : ''} ${toast.action ? 'with-action' : ''}`} role="status">
+          <span>{toast.msg}</span>
+          {toast.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.action!.run()
+                notify('Teruggezet')
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>

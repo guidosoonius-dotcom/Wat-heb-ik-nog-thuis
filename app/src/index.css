@@ -317,3 +317,8 @@ input { min-width: 0; }
 .deal-best { color: var(--accent); }
 .deal-badge { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .deal-badge.as-button { display: inline-flex; flex-wrap: nowrap; }
+.remove-btn { width: 36px; height: 44px; flex: none; display: grid; place-items: center; color: var(--muted); border-radius: 12px; margin-left: -4px; }
+.remove-btn:active { background: var(--soft); }
+.toast.with-action { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 10px 10px 16px; }
+.toast.with-action button { flex: none; min-height: 36px; padding: 0 12px; border-radius: 10px; background: rgba(255,255,255,0.16); color: #fff; font-size: 14px; font-weight: 700; }
+.unit-price { color: var(--ink); font-weight: 700; }

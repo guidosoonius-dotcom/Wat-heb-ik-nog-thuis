@@ -13,10 +13,10 @@ interface Inventory {
   refreshDeals: () => Promise<void>
   products: Product[]
   loading: boolean
-  toast: string | null
+  toast: Toast | null
   offline: boolean
   pending: number
-  notify: (msg: string) => void
+  notify: (msg: string, action?: ToastAction) => void
   reload: () => Promise<void>
   adjustQty: (id: string, delta: number) => Promise<void>
   addProduct: (input: ProductInput) => Promise<Product | null>
@@ -32,6 +32,15 @@ interface Inventory {
   updatePlace: (id: string, patch: Partial<Place>) => Promise<void>
   deletePlace: (id: string) => Promise<void>
   renameHousehold: (name: string) => Promise<void>
+}
+
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+export interface Toast {
+  msg: string
+  action?: ToastAction
 }
 
 const Ctx = createContext<Inventory | null>(null)
@@ -88,7 +97,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
   const [loading, setLoading] = useState(true)
   const productsRef = useRef<Product[]>([])
   productsRef.current = products
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<Toast | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
   const [offline, setOffline] = useState(!navigator.onLine)
   const outboxKey = `outbox-${householdId}`
@@ -107,10 +116,10 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
     [outboxKey],
   )
 
-  const notify = useCallback((msg: string) => {
-    setToast(msg)
+  const notify = useCallback((msg: string, action?: ToastAction) => {
+    setToast({ msg, action })
     window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setToast(null), 2600)
+    toastTimer.current = window.setTimeout(() => setToast(null), action ? 5000 : 2600)
   }, [])
 
   const fail = useCallback(
@@ -249,7 +258,7 @@ export function InventoryProvider({ householdId, children }: { householdId: stri
       const local = {
         qty: 0, min_qty: 1, place_id: null, category_id: null, expiry_date: null, barcode: null, on_list: false, list_qty: null,
         list_checked: false, list_checked_at: null, image_url: null, size_label: null, pao_months: null, opened_at: null,
-        store: null, use_rate: null, updated_at: new Date().toISOString(), ...row,
+        store: null, use_rate: null, list_dismissed_qty: null, updated_at: new Date().toISOString(), ...row,
       } as Product
       const offlineSave = () => {
         queue({ k: 'insert', table: 'products', row })

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useInventory } from '../lib/inventory'
 import { toBuy } from '../lib/logic'
-import { STORE_NAME, dealsByProduct, estimateDiscount } from '../lib/deals'
+import { STORE_NAME, dealsByProduct, effectivePrice, estimateDiscount, formatUnitPrice, unitPrice } from '../lib/deals'
 import type { Deal, Product } from '../lib/types'
 import { Icon } from './Icon'
 
@@ -74,7 +74,7 @@ export function DealPicker({ productId, onClose }: { productId: string; onClose:
           <div className="action-title">
             <h2 id="deal-picker-title">{product.name}</h2>
             <span className="muted small">
-              {list.length} {list.length === 1 ? 'actie' : 'acties'} · beste eerst{product.store ? `, ${product.store} voorop` : ''}
+              {list.length} {list.length === 1 ? 'actie' : 'acties'} · {list.filter((d) => unitPrice(d)).length >= 2 ? 'laagste prijs per kg/liter eerst' : 'beste eerst'}{product.store ? `, ${product.store} voorop` : ''}
             </span>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Sluiten">
@@ -103,8 +103,9 @@ export function DealPicker({ productId, onClose }: { productId: string; onClose:
                     ) : (
                       d.title
                     )}
-                    {d.price !== null && ` · ${price(d.price)}`}
+                    {(d.price ?? effectivePrice(d)) !== null && ` · ${d.price === null ? '± ' : ''}${price(d.price ?? effectivePrice(d))}`}
                     {d.old_price !== null && <s> {price(d.old_price)}</s>}
+                    {unitPrice(d) && <strong className="unit-price"> · {formatUnitPrice(unitPrice(d)!)}</strong>}
                     {until(d.valid_until) && ` · ${until(d.valid_until)}`}
                     {d.online_only && ' · alleen online'}
                     {i === 0 && <strong className="deal-best"> · Beste keus</strong>}
@@ -121,7 +122,10 @@ export function DealPicker({ productId, onClose }: { productId: string; onClose:
             )
           })}
         </div>
-        <p className="hint">Het voordeel is een schatting: "1+1 gratis" telt als 50%, "2e halve prijs" als 25%. Zonder prijs of percentage staat er geen schatting bij.</p>
+        <p className="hint">
+          Het voordeel is een schatting: "1+1 gratis" telt als 50%, "2e halve prijs" als 25%. De prijs per kg of liter is berekend met de actieprijs
+          (bij "1+1 gratis" de helft van de normale prijs) en de inhoud uit de productnaam; die staat er alleen bij als beide bekend zijn.
+        </p>
       </div>
     </div>
   )
@@ -187,6 +191,7 @@ export function DealsSection({ onShowDeals }: { onShowDeals: (productId: string)
                   )}
                   {deal.price !== null && ` · ${price(deal.price)}`}
                   {deal.old_price !== null && <s> {price(deal.old_price)}</s>}
+                  {unitPrice(deal) && <strong className="unit-price"> · {formatUnitPrice(unitPrice(deal)!)}</strong>}
                   {deal.valid_until && ` · t/m ${new Date(deal.valid_until + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
                   {deal.online_only && ' · alleen online'}
                 </small>

@@ -57,13 +57,14 @@ Deno.serve(async (req) => {
 async function weekly(supabase: ReturnType<typeof createClient>) {
   const { data: products } = await supabase
     .from('products')
-    .select('household_id, name, qty, min_qty, on_list, list_checked, expiry_date, use_rate')
+    .select('household_id, name, qty, min_qty, on_list, list_checked, list_dismissed_qty, expiry_date, use_rate')
   const soon = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
   const byHh = new Map<string, { buy: string[]; expiring: string[] }>()
   for (const p of products ?? []) {
     const e = byHh.get(p.household_id) ?? { buy: [], expiring: [] }
     const predicted = p.use_rate && p.qty > 0 && p.qty >= p.min_qty && p.qty / p.use_rate <= 7
-    if (!p.list_checked && (p.on_list || p.qty < p.min_qty || predicted)) e.buy.push(p.name)
+    const dismissed = p.list_dismissed_qty !== null && p.qty >= p.list_dismissed_qty
+    if (!p.list_checked && (p.on_list || ((p.qty < p.min_qty || predicted) && !dismissed))) e.buy.push(p.name)
     if (p.expiry_date && p.expiry_date <= soon) e.expiring.push(p.name)
     byHh.set(p.household_id, e)
   }
@@ -77,7 +78,7 @@ async function weekly(supabase: ReturnType<typeof createClient>) {
     const parts: string[] = []
     if (buy.length) parts.push(`${buy.length} op het lijstje (${buy.slice(0, 3).join(', ')}${buy.length > 3 ? '…' : ''})`)
     if (expiring.length) parts.push(`${expiring.length} verloopt binnen 2 weken`)
-    if (onSale) parts.push(`${onSale} in de aanbieding bij AH/Jumbo`)
+    if (onSale) parts.push(`${onSale} in de aanbieding`)
     const payload = JSON.stringify({ title: 'Weekoverzicht', body: parts.join(' · '), url: '/' })
     const { data: subs } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('household_id', hh)
     for (const s of subs ?? []) {
